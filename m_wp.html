@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Pendukung Keputusan - Metode Weighted Product</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #1a202c;
+            color: #f7fafc;
+            font-family: 'Poppins', sans-serif;
+        }
+        input, button {
+            background-color: #2d3748;
+            color: #f7fafc;
+            border-color: #4a5568;
+            font-family: 'Poppins', sans-serif;
+        }
+        input::placeholder {
+            color: #a0aec0;
+        }
+        button:hover {
+            background-color: #4a5568;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        th, td {
+            border: 1px solid #4a5568;
+            padding: 0.5rem;
+            text-align: center;
+        }
+        th {
+            background-color: #2d3748;
+        }
+        #chart-container {
+            margin-top: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mx-auto p-6">
+        <h2 class="text-2xl font-bold mb-4">Decision Support System - WP Method</h2>
+        <div class="mb-4">
+            <label for="alternatives" class="block text-lg mb-1">Jumlah Alternatif:</label>
+            <input type="number" id="alternatives" class="border rounded w-full py-2 px-3" required>
+        </div>
+        <div class="mb-4">
+            <label for="criteria" class="block text-lg mb-1">Jumlah Kriteria:</label>
+            <input type="number" id="criteria" class="border rounded w-full py-2 px-3" required>
+        </div>
+        <div id="weights-inputs" class="mb-4"></div>
+        <div id="values-inputs" class="mb-4"></div>
+        <button onclick="generateInputs()" class="bg-blue-500 text-white py-2 px-4 rounded mb-4">Buat Inputan</button>
+        <button onclick="calculateWP()" class="bg-green-500 text-white py-2 px-4 rounded">Hitung</button>
+        <div id="results" class="mt-6"></div>
+        <div id="conclusion" class="mt-4"></div>
+        <div id="chart-container">
+            <canvas id="wpChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        function generateInputs() {
+            const numCriteria = parseInt(document.getElementById('criteria').value);
+            const weightsContainer = document.getElementById('weights-inputs');
+            const valuesContainer = document.getElementById('values-inputs');
+            
+            weightsContainer.innerHTML = '<h3 class="text-lg font-semibold mb-2">Masukkan Bobot untuk Tiap Kriteria:</h3>';
+            for (let i = 0; i < numCriteria; i++) {
+                weightsContainer.innerHTML += `<div class="mb-4"><label for="weight${i+1}" class="block mb-1">Bobot untuk Kriteria ${i+1}:</label><input type="number" id="weight${i+1}" class="border rounded w-full py-2 px-3" required></div>`;
+            }
+            
+            const numAlternatives = parseInt(document.getElementById('alternatives').value);
+            valuesContainer.innerHTML = '<h3 class="text-lg font-semibold mb-2">Masukkan Nilai untuk Tiap Alternatif:</h3>';
+            for (let i = 0; i < numAlternatives; i++) {
+                valuesContainer.innerHTML += `<h4 class="text-md font-semibold mb-1">Alternatif ${i+1}:</h4>`;
+                for (let j = 0; j < numCriteria; j++) {
+                    valuesContainer.innerHTML += `<div class="mb-4"><label for="value${i+1}-${j+1}" class="block mb-1">Nilai untuk Kriteria ${j+1}:</label><input type="number" id="value${i+1}-${j+1}" class="border rounded w-full py-2 px-3" required></div>`;
+                }
+            }
+        }
+
+        function calculateWP() {
+            const numAlternatives = parseInt(document.getElementById('alternatives').value);
+            const numCriteria = parseInt(document.getElementById('criteria').value);
+
+            // Get weights
+            const weights = [];
+            for (let i = 0; i < numCriteria; i++) {
+                weights.push(parseFloat(document.getElementById(`weight${i+1}`).value));
+            }
+
+            // Normalize weights
+            const totalWeight = weights.reduce((acc, w) => acc + w, 0);
+            const normalizedWeights = weights.map(w => w / totalWeight);
+
+            // Get values
+            const values = [];
+            for (let i = 0; i < numAlternatives; i++) {
+                const altValues = [];
+                for (let j = 0; j < numCriteria; j++) {
+                    altValues.push(parseFloat(document.getElementById(`value${i+1}-${j+1}`).value));
+                }
+                values.push(altValues);
+            }
+
+            // Calculate WP score for each alternative
+            const wpScores = values.map(alt => 
+                alt.reduce((acc, val, i) => acc * Math.pow(val, normalizedWeights[i]), 1)
+            );
+
+            // Display results in a table
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<h2 class="text-xl font-bold mb-4">Hasil Perhitungan WP</h2>';
+            const table = document.createElement('table');
+            const headerRow = table.insertRow();
+            headerRow.insertCell().outerHTML = '<th>Alternatif</th>';
+            headerRow.insertCell().outerHTML = '<th>Skor WP</th>';
+            wpScores.forEach((score, i) => {
+                const row = table.insertRow();
+                row.insertCell().innerText = `Alternatif ${i+1}`;
+                row.insertCell().innerText = score;
+            });
+            resultsDiv.appendChild(table);
+
+            // Create chart
+            const ctx = document.getElementById('wpChart').getContext('2d');
+            const wpChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: wpScores.map((_, i) => `Alternatif ${i+1}`),
+                    datasets: [{
+                        label: 'Skor WP',
+                        data: wpScores,
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // Find the best alternative
+            const bestScore = Math.max(...wpScores);
+            const bestAlternative = wpScores.indexOf(bestScore) + 1;
+            const conclusionDiv = document.getElementById('conclusion');
+            conclusionDiv.innerHTML = `<h2 class="text-xl font-bold mb-4">Kesimpulan</h2>`;
+            conclusionDiv.innerHTML += `<p>Alternatif terbaik adalah Alternatif ${bestAlternative} dengan skor ${bestScore}.</p>`;
+        }
+    </script>
+</body>
+</html>
